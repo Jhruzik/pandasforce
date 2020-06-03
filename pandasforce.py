@@ -300,3 +300,37 @@ def create_job(operation: str, sfobject: str, session: Session, chunk_size: int 
         return Job(job_id, operation, sfobject, session)
     else:
         raise RuntimeError(exception_msg)
+        
+
+# Turn Data into Batches
+def _batchify(data, batch_size: int, sep = ",", encoding = "utf-8"):
+    
+    # Read in CSV file
+    if type(data) is str and os.path.isfile(data) and data.endswith(".csv"):
+        data = pd.read_csv(data, sep = sep, encoding = encoding)
+        
+    # Chunk Data into Batches
+    pos = 0
+    batches = []
+    size = data.shape[0]
+    while pos < size:
+        batches.append(data.iloc[pos:pos+batch_size])
+        pos += batch_size
+        
+    return batches
+
+# Insert API
+def insert(sfobject: str, data, s: Session, batch_size = 1000, sep = ",", encoding = "utf-8"):
+    
+    # Create Job
+    job = create_job("insert", sfobject, s)
+    
+    # Split Data into Batches
+    batches = _batchify(data)
+            
+    # Add Single Batches to Job
+    for batch in batches:
+        job.append_batch(batch)
+        
+    # Close Job
+    job.close()

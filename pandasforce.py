@@ -9,7 +9,6 @@ import re
 import os
 from io import StringIO
 
-
 ###--------------------------------Classes--------------------------------###
 
 # Login Session
@@ -45,7 +44,7 @@ class Job:
 
 
     # Close Job
-    def close(self, session = None):
+    def close(self, session = None, verbose = True):
         
         if session is None:
             session = self.session
@@ -74,7 +73,8 @@ class Job:
         if exception_msg is not None:
             raise RuntimeError(exception_msg)
         else:
-            print("Job {} closed".format(self.job_id))
+            if verbose:
+                print("Job {} closed".format(self.job_id))
           
             
     # Add Batch to Job
@@ -195,9 +195,13 @@ class Job:
                 result_id = re.search("<result>(.+)</result>", response.text).group(1)
                 get_url = "https://{}.salesforce.com/services/async/47.0/job/{}/batch/{}/result/{}".format(session.instance, self.job_id, b, result_id)
                 response = requests.get(get_url, headers = header)
-            response_io = StringIO(response.text)
-            response_pd = pd.read_csv(response_io, encoding = "utf-8")
-            results.append(response_pd)
+            if "exceptionMessage" in response.text:
+                exception = re.search("<exceptionMessage>(.+)</exceptionMessage>", response.text).group(1)
+                raise ValueError(exception)
+            else:
+                response_io = StringIO(response.text)
+                response_pd = pd.read_csv(response_io, encoding = "utf-8")
+                results.append(response_pd)
   
         # Return Result as Pandas DataFrame
         result_pd = pd.concat(results)
@@ -251,7 +255,7 @@ def create_job(operation: str, sfobject: str, session: Session, chunk_size: int 
     operation = operation.lower()
     operations_allowed = ["insert", "update", "delete", "query"]
     if operation not in operations_allowed:
-        raise ValueError("Operation {} not supported. Please choose either: "+
+        raise ValueError("Operation {} not supported. Please choose either: ".format(operation) +
                          "'insert', 'update', 'delete', or 'query'")
     
     
@@ -319,18 +323,73 @@ def _batchify(data, batch_size: int, sep = ",", encoding = "utf-8"):
         
     return batches
 
-# Insert API
-def insert(sfobject: str, data, s: Session, batch_size = 1000, sep = ",", encoding = "utf-8"):
+
+# API for getting Data into SalesForce
+def push(operation: str, sfobject: str, data, session: Session, 
+         batch_size = 1000, sep = ",", encoding = "utf-8", verbose = False):
     
     # Create Job
-    job = create_job("insert", sfobject, s)
+    job = create_job(operation, sfobject, session)
     
     # Split Data into Batches
-    batches = _batchify(data)
+    batches = _batchify(data, batch_size, sep = sep, encoding = encoding)
             
     # Add Single Batches to Job
     for batch in batches:
-        job.append_batch(batch)
+        job.add_batch(batch)
         
     # Close Job
-    job.close()
+    job.close(verbose = verbose)
+    
+    # Get Status
+    complete = False
+    while not complete:
+        status_messages = job.get_status()
+        processed = sum([x["processed"] for x in status_messages ])
+        print("Processed {} entries".format(processed), end = "\r")
+        completed = len([x for x in status_messages if x["status"] in ["Completed", "Failed"]])
+        complete = int(len(status_messages)) == int(completed)
+    
+    # Print Final Status Report
+    if verbose:
+        print("Final Status Report:")
+        for i in status_messages:
+            print(i)
+    
+    # Return Result
+    return job.get_results()
+
+
+# API for getting Data from SalesForce
+def pull(query: str, sfobject: str, session: Session, chunk_size = 1000, verbose = False):
+    
+    # Sanity Check for Query
+    if not "select" in query.lower() or "from" not in query.lower():
+        raise ValueError("Something seems wrong with your query")
+    
+    # Create Job
+    job = create_job("query", sfobject, session, chunk_size)
+    
+    # Add Query as a Batch
+    job.add_batch(query)
+    
+    # Close Job
+    job.close(verbose = verbose)
+    
+    # Get Status
+    complete = False
+    while not complete:
+        status_messages = job.get_status()
+        processed = sum([x["processed"] for x in status_messages ])
+        print("Processed {} entries".format(processed), end = "\r")
+        completed = len([x for x in status_messages if x["status"] in ["Completed", "Failed"]]) + 1
+        complete = int(len(status_messages)) == int(completed)
+        
+    # Print Final Status Report
+    if verbose:
+        print("Final Status Report:")
+        for i in status_messages[1:]:
+            print(i)
+    
+    # Return Result
+    return job.get_results()

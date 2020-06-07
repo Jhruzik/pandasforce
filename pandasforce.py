@@ -413,7 +413,7 @@ def push(operation: str, sfobject: str, data, session: Session,
         
     verbose: Boolean
         If set to True, you will receive further information
-        about your workload. Very usefull for debugging.
+        about your workload. Very useful for debugging.
         
     Returns
     ----------
@@ -479,7 +479,7 @@ def pull(query: str, sfobject: str, session: Session, chunk_size = 1000, verbose
         
     verbose: Boolean
         If set to True, you will receive further information
-        about your workload. Very usefull for debugging. Note that
+        about your workload. Very useful for debugging. Note that
         you will receive a final status report. If everything worked,
         all batches will be 'Finished' but one. One batch will show
         the status 'Not Processed'. This is your query trigger and 

@@ -171,7 +171,7 @@ class Job:
         
         # Check that all Batches are processed
         status = self.get_status(session)
-        batches = [x["id"] for x in status if x["id"] not in batches_ignore]
+        batches = [x["id"] for x in status if x["id"] not in batches_ignore and x["processed"] > 0]
         results = []
         
         # Fetch Results
@@ -344,7 +344,7 @@ def push(operation: str, sfobject: str, data, session: Session,
     while not complete:
         status_messages = job.get_status()
         processed = sum([x["processed"] for x in status_messages ])
-        print("Processed {} entries".format(processed), end = "\r")
+        print("\rProcessed {} entries".format(processed), end = "")
         completed = len([x for x in status_messages if x["status"] in ["Completed", "Failed"]])
         complete = int(len(status_messages)) == int(completed)
     
@@ -370,19 +370,15 @@ def pull(query: str, sfobject: str, session: Session, chunk_size = 1000, verbose
     
     # Add Query as a Batch
     job.add_batch(query)
-    
-    # Close Job
-    job.close(verbose = verbose)
-    
-    # Sleep for Server to Catch Up
-    time.sleep(0.5)
-    
+
+    # Sleep so Server can Catch Up
+    time.sleep(1)
+
     # Get Status
     complete = False
     while not complete:
         status_messages = job.get_status()
-        init_batch, init_status, init_message = [(x["id"], x["status"], x["message"]) for x in status_messages \
-                                                     if x["status"] == "NotProcessed" and x["processed"] == 0][0]
+        init_batch, init_status, init_message = [(x["id"], x["status"], x["message"]) for x in status_messages if x["status"] == "NotProcessed" and x["processed"] == 0][0]
         if init_status == "Failed":
             raise RuntimeError(init_message)
         processed = sum([x["processed"] for x in status_messages ])
@@ -390,10 +386,14 @@ def pull(query: str, sfobject: str, session: Session, chunk_size = 1000, verbose
         completed = len([x for x in status_messages if x["status"] in ["Completed", "Failed"]]) + 1
         if completed > 1:
             complete = int(len(status_messages)) == int(completed)
+    print("")
+            
+    # Close Job
+    job.close(verbose = verbose)
         
     # Print Final Status Report
     if verbose:
-        print("\nFinal Status Report:")
+        print("Final Status Report:")
         for i in status_messages:
             print(i)
     

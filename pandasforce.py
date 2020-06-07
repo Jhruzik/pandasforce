@@ -7,6 +7,7 @@ import requests
 import pandas as pd
 import re
 import os
+import time
 from io import StringIO
 
 ###--------------------------------Classes--------------------------------###
@@ -162,25 +163,18 @@ class Job:
     
     
     # Fetch Results
-    def get_results(self, session = None):
+    def get_results(self, session = None, batches_ignore = []):
         
         # Parse Input
         if session is None:
             session = self.session
         
         # Check that all Batches are processed
-        current_status = self.get_status(session)
-        if self.operation == "query":
-            current_status = current_status[1:]
-        status_list = [x["status"] for x in current_status]
-        
-        if not all([x in ["Completed", "Failed"] for x in status_list]):
-            print("Not all Batches are done yet")
-            return None
-        else:
-            batches = [x["id"] for x in current_status]
-            
+        status = self.get_status(session)
+        batches = [x["id"] for x in status if x["id"] not in batches_ignore]
         results = []
+        
+        # Fetch Results
         for b in batches:
             
             # Define URL for GET request
@@ -192,9 +186,13 @@ class Job:
             # Make GET Request
             response = requests.get(get_url, headers = header)
             if self.operation == "query":
-                result_id = re.search("<result>(.+)</result>", response.text).group(1)
-                get_url = "https://{}.salesforce.com/services/async/47.0/job/{}/batch/{}/result/{}".format(session.instance, self.job_id, b, result_id)
-                response = requests.get(get_url, headers = header)
+                result = re.search("<result>(.+)</result>", response.text)
+                if result is not None:
+                    result_id = result.group(1)
+                    get_url = "https://{}.salesforce.com/services/async/47.0/job/{}/batch/{}/result/{}".format(session.instance, self.job_id, b, result_id)
+                    response = requests.get(get_url, headers = header)
+            
+            # Parse Response
             if "exceptionMessage" in response.text:
                 exception = re.search("<exceptionMessage>(.+)</exceptionMessage>", response.text).group(1)
                 raise ValueError(exception)
@@ -376,20 +374,28 @@ def pull(query: str, sfobject: str, session: Session, chunk_size = 1000, verbose
     # Close Job
     job.close(verbose = verbose)
     
+    # Sleep for Server to Catch Up
+    time.sleep(0.5)
+    
     # Get Status
     complete = False
     while not complete:
         status_messages = job.get_status()
+        init_batch, init_status, init_message = [(x["id"], x["status"], x["message"]) for x in status_messages \
+                                                     if x["status"] == "NotProcessed" and x["processed"] == 0][0]
+        if init_status == "Failed":
+            raise RuntimeError(init_message)
         processed = sum([x["processed"] for x in status_messages ])
-        print("Processed {} entries".format(processed), end = "\r")
+        print("\rProcessed {} entries".format(processed), end = "")
         completed = len([x for x in status_messages if x["status"] in ["Completed", "Failed"]]) + 1
-        complete = int(len(status_messages)) == int(completed)
+        if completed > 1:
+            complete = int(len(status_messages)) == int(completed)
         
     # Print Final Status Report
     if verbose:
-        print("Final Status Report:")
-        for i in status_messages[1:]:
+        print("\nFinal Status Report:")
+        for i in status_messages:
             print(i)
     
     # Return Result
-    return job.get_results()
+    return job.get_results(batches_ignore = [init_batch])

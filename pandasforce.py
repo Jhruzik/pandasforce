@@ -209,6 +209,31 @@ class Job:
 
 # Login
 def login(username: str, password: str, token: str):
+    """ Used to log into SalesForce. Will return an instance
+    of the Session object. Must be used for every interaction
+    with SalesForce.
+    
+    Parameters
+    ----------
+    username: str
+        You username that you use to log into SalesForce.
+    
+    password: str
+        The password you use to log into SalesFroce with the 
+        specified username.
+        
+    token: str
+        The security token you have received for your SalesForce
+        account. Normally, this is sent via email after every
+        password change. Check that your org has security tokens
+        activated.
+        
+    Returns
+    ----------
+    session: Session
+        An instance of the Session class. This instance must be
+        passed into every push or pull operation that you use.
+    """
     
     # Create Login XML
     login_xml = r"""<?xml version="1.0" encoding="utf-8" ?>
@@ -248,6 +273,34 @@ def login(username: str, password: str, token: str):
 
 # Creating a Job
 def create_job(operation: str, sfobject: str, session: Session, chunk_size: int = 1000):
+    """Creates a job on the SalesForce Data Cloud. This is a
+    prerequesit for every operation.
+    
+    Parameters
+    ----------
+    operation: str
+        One of either 'insert', 'update', 'delete', or 'query'.
+        
+    sfobject: str
+        The name of the SalesForce object you want to operate on.
+        
+    session: Session
+        An active instance of the Session class. Use the login()
+        function to create one. This object holds your credentials.
+        
+    chunk_size: int
+        If your operation is 'query', the results will be split
+        into multiple batches of size equal to 'chunk_size'.
+        This will increase performance for large chunks of data
+        since it will be downloaded in separate chunks. Will be
+        ignored, if operation is not 'query'.
+        
+    Returns
+    ----------
+    job: Job
+        An instance of the Job class. All further interaction
+        with SalesForce will happen via the interface of this instance.
+    """
     
     # Check if opeation in allowed
     operation = operation.lower()
@@ -325,6 +378,49 @@ def _batchify(data, batch_size: int, sep = ",", encoding = "utf-8"):
 # API for getting Data into SalesForce
 def push(operation: str, sfobject: str, data, session: Session, 
          batch_size = 1000, sep = ",", encoding = "utf-8", verbose = False):
+    """Used to push data into SalesForce and trigger changes
+    inside the SalesForce Data Cloud.
+    
+    Parameters
+    ----------
+    operation: str
+        Either one of 'insert', 'update', or 'delete'.
+        
+    sfobject: str
+        The name of the SalesForce object you want to operate on.
+        
+    data: pandas.DataFrame or FilePath
+        The data you want to push into SalsForce. This can either
+        be a Pandas DataFrame or the path to a csv file. Note
+        that if you give a csv file path, the data will be
+        loaded into a Pandas DataFrame for you.
+        
+    session: Session
+        An active instance of the Session class. Use the login()
+        function to create one. This object holds your credentials.
+        
+    batch_size: int
+        Your input will be split into batches of this size. This
+        is done to speed up upload time.
+        
+    sep: str
+        If you give a csv file path for the data argument, this
+        is the field separator used in your csv file.
+        
+    encoding: str
+        If you give a csv file path for the data argument, this
+        is the file's encoding.
+        
+    verbose: Boolean
+        If set to True, you will receive further information
+        about your workload. Very usefull for debugging.
+        
+    Returns
+    ----------
+    result: pandas.DataFrame
+        A Pandas DataFrame holding the results and IDs of the
+        data that you have pushed into SalesForce.
+    """
     
     # Create Job
     job = create_job(operation, sfobject, session)
@@ -360,6 +456,40 @@ def push(operation: str, sfobject: str, data, session: Session,
 
 # API for getting Data from SalesForce
 def pull(query: str, sfobject: str, session: Session, chunk_size = 1000, verbose = False):
+    """Used to pull data from SalesForce into a Pandas DataFrame.
+    
+    Parameters
+    ----------
+    query: str
+        An SOQL query you would like to run on the SalesForce
+        DataCloud.
+        
+    sfobject: str
+        The name of the SalesForce object you want to query.
+        
+    session: Session
+        An active instance of the Session class. Use the login()
+        function to create one. This object holds your credentials.
+        
+    chunk_size: int
+        Your output will be split into batches of this size. This
+        is done to speed up download time. The final result will
+        be a single Pandas DataFrame holding the data from all
+        chunks.
+        
+    verbose: Boolean
+        If set to True, you will receive further information
+        about your workload. Very usefull for debugging. Note that
+        you will receive a final status report. If everything worked,
+        all batches will be 'Finished' but one. One batch will show
+        the status 'Not Processed'. This is your query trigger and 
+        it is completely expected.
+        
+    Returns
+    ----------
+    result: pandas.DataFrame
+        A Pandas DataFrame holding the results of your query.
+    """
     
     # Sanity Check for Query
     if not "select" in query.lower() or "from" not in query.lower():

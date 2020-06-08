@@ -39,6 +39,7 @@ leads_insert = pf.push(operation = "insert", sfobject = "lead", data = leads,
 ```
 
 This will insert the data into SalesForce. The push() function takes the following parameters:
+    
     operation: str
         Either one of 'insert', 'update', or 'delete'.
         
@@ -143,8 +144,8 @@ Next, we need to insert some data as batches to our job. This can be done by usi
 
 ```
 df = pd.DataFrame({"Company": ["A", "B", "C"],
-		      "FirstName": ["John", "Jack", "Sarah"],
-		      "LastName": ["Doe", "Smith", "Miller"]}) 
+		   "FirstName": ["John", "Jack", "Sarah"],
+		   "LastName": ["Doe", "Smith", "Miller"]}) 
 job.add_batch(df)
 ```
 

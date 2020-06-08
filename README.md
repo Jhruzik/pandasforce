@@ -140,3 +140,6 @@ When all batches are added to your job, you must close the job by using the clos
 You can look up the progress of your job by running the get_stats() method. THis will return a list of dictionaries. Every dictionary represents a single batch and contains information on the current status as well as how many items have been processed yet. If you are quering data, note that there will always be one batch with status "Not Processed" and 0 processed items. This is the initial batch that creates all other batches.
 
 When all batches are processed sucessfully, you can obtain the results by calling the get_results() method. The result will be a Pandas DataFrame holding the IDs for insert, update, and delete operations. If your job is a query, it will hold the result of your SOQL query.
+
+## References
+This modules was built by using SalesForce's official [Bulk API Documentation](https://developer.salesforce.com/docs/atlas.en-us.api_asynch.meta/api_asynch/).

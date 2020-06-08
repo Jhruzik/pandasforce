@@ -14,12 +14,16 @@ However, if you decide to import the source code, make sure that the following d
 ## Usage
 
 The following imports are taken as given:
-```import pandas as pd
-import pandasforce as pf```
+```
+import pandas as pd
+import pandasforce as pf
+```
 
 #### High Level API
 In order to interact with your orgs data cloud, you need to create an active session by logging in. Assume that your user account is "john.doe@test.com" and your password is "Test12345" and that your security token is equal to "Hello123". Use the login(username, password, token) function to create an active session:
-```session = pf.login(username = "john.doe@test.com", password = "Test12345", token = "Hello123")```
+```
+session = pf.login(username = "john.doe@test.com", password = "Test12345", token = "Hello123")
+```
 
 Now you can either use the push() function to change data inside SalesForce or pull() to get data from SalesForce. Let's assume that you create a pandas DataFrame holding information on leads and you want to insert those leads into SalesForce:
 
@@ -97,14 +101,18 @@ If you decide to query data residing in your SalesForce data cloud, you can use 
         it is completely expected.
 
 The result will be a Pandas DataFrame holding the results of your SOQL query. Note that your query must be valid SOQL. SOQL only supports a subset of normal SQL commands. Assume that we want to extract the company name, the first name, and the last name of all our leads. Also, we are going to use the session previously defined:
-```leads = pf.pull(query = "SELECT Company,FirstName,LastName FROM Lead", sfobject = "lead", session = session)```
+```
+leads = pf.pull(query = "SELECT Company,FirstName,LastName FROM Lead", sfobject = "lead", session = session)
+```
 leads will be a regular Pandas DataFrame holding all of our leads.
 
 #### Low Level API
 If you wish to have more control over your operations, you can opt to use a more low-level API. Note that the push() and pull() functions are simple wrappers.
 
 Creating a session is the same as for the high level api. Create a session by logging in:
-```session = pf.login(username = "john.doe@test.com", password = "Test12345", token = "Hello123")```
+```
+session = pf.login(username = "john.doe@test.com", password = "Test12345", token = "Hello123")
+```
 
 The next step will be to create a job. This job will be our point of interaction with SalesForce's Bulk API. The create_job() functions takes the following parameters:
 
@@ -127,25 +135,35 @@ The next step will be to create a job. This job will be our point of interaction
 
 Let's say you would like to insert some leads into SalesForce. First, we need to create a job after logging in:
 
-```job = pf.create_job(operation = "insert", sfobject = "lead", session = session)```
+```
+job = pf.create_job(operation = "insert", sfobject = "lead", session = session)
+```
 
 Next, we need to insert some data as batches to our job. This can be done by using the add_batch() method which takes either a Pandas DataFrame or the path to a csv file.
 
-```df = pd.DataFrame({"Company": ["A", "B", "C"],
+```
+df = pd.DataFrame({"Company": ["A", "B", "C"],
 		      "FirstName": ["John", "Jack", "Sarah"],
 		      "LastName": ["Doe", "Smith", "Miller"]}) 
-job.add_batch(df)```
+job.add_batch(df)
+```
 
 Note that it is encouraged to split your data into multiple batches. This will speed up processing. Also, your batch must not be larger than 10000 observations.
 
 When all batches are added to your job, you must close the job by using the close() method.
-```job.close()```
+```
+job.close()
+```
 
 You can look up the progress of your job by running the get_status() method. This will return a list of dictionaries. Every dictionary represents a single batch and contains information on the current status as well as how many items have been processed yet. If you are quering data, note that there will always be one batch with status "Not Processed" and 0 processed items. This is the initial batch that creates all other batches.
-```job.get_status()```
+```
+job.get_status()
+```
 
 When all batches are processed sucessfully, you can obtain the results by calling the get_results() method. The result will be a Pandas DataFrame holding the IDs for insert, update, and delete operations. If your job is a query, it will hold the result of your SOQL query.
-```job.get_results()```
+```
+job.get_results()
+```
 
 ## References
 This modules was built by using SalesForce's official [Bulk API Documentation](https://developer.salesforce.com/docs/atlas.en-us.api_asynch.meta/api_asynch/).
